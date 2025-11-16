@@ -1,0 +1,942 @@
+/* =================================================================
+   0. RESET y Corrección de Visualización Global (FIX DEL BORDE NEGRO)
+================================================================= */
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+    /* 💥 IMPORTANTE: Elimina el scroll horizontal no deseado */
+    overflow-x: hidden; 
+}
+
+#root {
+    width: 100%;
+    min-height: 100vh;
+}
+
+/* =================================================================
+   1. Importaciones y Variables
+================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200..800&display=swap');
+/* 🟢 CRÍTICO: Asegura que la fuente del icono se cargue */
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
+
+/* Colores y Variables (Tomados de la config de Tailwind original) */
+:root {
+    --color-primary: #137fec;
+    --color-background-light: #f6f7f8;
+    --color-background-dark: #101922;
+    /* ... (mantener el resto de variables) ... */
+    --color-slate-50: #f8fafc;
+    --color-slate-200: #e2e8f0;
+    --color-slate-300: #cbd5e1;
+    --color-slate-400: #94a3b8;
+    --color-slate-500: #64748b;
+    --color-slate-600: #475569;
+    --color-slate-800: #1e293b;
+    --color-slate-900: #0f172a;
+    --font-family-display: 'Plus Jakarta Sans', 'Noto Sans', sans-serif;
+    --border-radius-lg: 1rem;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Base de Material Symbols: CRÍTICO PARA QUE SE VEAN COMO ICONOS */
+.material-symbols-outlined {
+    font-family: 'Material Symbols Outlined'; /* 🟢 Esta línea es clave */
+    font-weight: normal;
+    font-style: normal;
+    display: inline-block;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+    
+    /* Variaciones de estilo predeterminadas */
+    font-variation-settings:
+        'FILL' 0,
+        'wght' 400,
+        'GRAD' 0,
+        'opsz' 24;
+}
+
+/* =================================================================
+   2. Estilos Globales y Dark Mode
+================================================================= */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ... (el resto de la sección 2 se mantiene igual) ... */
+.app-container {
+    font-family: var(--font-family-display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--color-background-light);
+    color: var(--color-slate-900);
+    /* 💥 Importante: Asegura que el contenedor principal respete el reset global */
+    overflow-x: hidden;
+    width: 100%;
+}
+
+/* Dark Mode */
+.app-container.dark-mode {
+    background-color: var(--color-background-dark);
+    color: var(--color-slate-50);
+}
+
+.app-container.dark-mode .text-slate-900 { color: var(--color-slate-50); }
+.app-container.dark-mode .text-slate-800 { color: var(--color-slate-300); }
+.app-container.dark-mode .text-slate-600 { color: var(--color-slate-400); }
+.app-container.dark-mode .text-slate-500 { color: var(--color-slate-400); }
+
+/* Contenido Principal (Usado para centrar contenido no-full-width) */
+.main-max-width-wrapper {
+    width: 100%;
+    max-width: none; /* quitar límite de 1280px */
+    margin: 0;
+    padding-left: 0; /* sin gutters laterales */
+    padding-right: 0; /* sin gutters laterales */
+    padding-top: 2.5rem; /* py-10 */
+    padding-bottom: 2.5rem; /* py-10 */
+}
+@media (min-width: 640px) { /* sm:px-6 */
+    .main-max-width-wrapper {
+        padding-left: 0;
+        padding-right: 0;
+    }
+}
+@media (min-width: 1024px) { /* lg:px-8 */
+    .main-max-width-wrapper {
+        padding-left: 0;
+        padding-right: 0;
+    }
+}
+@media (min-width: 768px) { /* md:py-16 */
+    .main-max-width-wrapper {
+        padding-top: 4rem;
+        padding-bottom: 4rem;
+    }
+}
+
+
+/* =================================================================
+   3. Header (TopNavBar)
+================================================================= */
+
+.main-header {
+    width: 100%;
+    z-index: 50;
+    background-color: rgba(246, 247, 248, 0.8); /* background-light/80 */
+    backdrop-filter: blur(4px);
+    position: sticky;
+    top: 0;
+}
+.app-container.dark-mode .main-header {
+    background-color: rgba(16, 25, 34, 0.8); /* background-dark/80 */
+}
+
+.header-content-wrapper {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding-left: 0; padding-right: 0;
+    padding-top: 0.75rem; padding-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--color-slate-200);
+}
+@media (min-width: 640px) {
+    .header-content-wrapper { padding-left: 0; padding-right: 0; }
+}
+@media (min-width: 1024px) {
+    .header-content-wrapper { padding-left: 0; padding-right: 0; }
+}
+.app-container.dark-mode .header-content-wrapper {
+    border-color: var(--color-slate-800);
+}
+
+.logo-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.logo-icon-container {
+    /* Ajuste del tamaño del ícono de huellita dentro del contenedor */
+    .logo-icon {
+      width: 1.5rem;
+      height: 1.5rem;
+      color: var(--primary);
+    }
+    .logo-icon .material-symbols-outlined {
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+}
+
+.logo-text {
+    font-size: 1.125rem; /* text-lg */
+    font-weight: 700; /* font-bold */
+    line-height: 1.25; /* leading-tight */
+    letter-spacing: -0.015em;
+    color: var(--color-slate-900);
+}
+.app-container.dark-mode .logo-text {
+    color: var(--color-slate-50);
+}
+
+.nav-desktop {
+    display: none;
+    flex: 1;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 2rem;
+}
+@media (min-width: 768px) {
+    .nav-desktop { display: flex; }
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 2.25rem; /* gap-9 */
+}
+
+.header-nav-link {
+    font-size: 0.875rem; /* text-sm */
+    font-weight: 500; /* font-medium */
+    line-height: 1.5; /* leading-normal */
+    color: var(--color-slate-800);
+    transition: color 0.15s ease-in-out;
+    text-decoration: none;
+}
+.header-nav-link:hover {
+    color: var(--color-primary);
+}
+.app-container.dark-mode .header-nav-link {
+    color: var(--color-slate-300);
+}
+.app-container.dark-mode .header-nav-link:hover {
+    color: var(--color-primary);
+}
+
+.header-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn {
+    min-width: 84px;
+    max-width: 480px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    height: 2.5rem; /* h-10 */
+    padding-left: 1rem;
+    padding-right: 1rem;
+    font-size: 0.875rem; /* text-sm */
+    font-weight: 700; /* font-bold */
+    line-height: 1.5;
+    letter-spacing: 0.015em;
+    transition: background-color 0.15s ease-in-out;
+    border: none;
+}
+
+.btn-primary {
+    background-color: var(--color-primary);
+    color: white;
+}
+.btn-primary:hover {
+    background-color: color-mix(in srgb, var(--color-primary) 90%, black);
+}
+
+.btn-secondary {
+    background-color: rgba(226, 232, 240, 0.6); /* slate-200/60 */
+    color: var(--color-slate-900);
+}
+.app-container.dark-mode .btn-secondary {
+    background-color: rgba(30, 41, 59, 0.6); /* slate-800/60 */
+    color: var(--color-slate-50);
+}
+.btn-secondary:hover {
+    background-color: var(--color-slate-200);
+}
+.app-container.dark-mode .btn-secondary:hover {
+    background-color: var(--color-slate-800);
+}
+
+.nav-mobile-menu {
+    display: block;
+}
+@media (min-width: 768px) {
+    .nav-mobile-menu { display: none; }
+}
+
+.menu-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    color: var(--color-slate-900);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+.app-container.dark-mode .menu-button {
+    color: var(--color-slate-50);
+}
+.menu-button:hover {
+    background-color: var(--color-slate-200);
+}
+.app-container.dark-mode .menu-button:hover {
+    background-color: var(--color-slate-800);
+}
+
+/* =================================================================
+   4. Sección Hero (FULL-WIDTH FIX IMPLEMENTADO)
+================================================================= */
+
+.hero-section {
+    margin-bottom: 3rem; /* mb-12 */
+    /* Edge-to-edge sin hack de 100vw */
+    width: 100%;
+    position: relative;
+}
+
+.hero-content-padding {
+    /* Contenedor que restringe el contenido (texto/botón) y lo centra */
+    max-width: 1280px; 
+    margin-left: auto;
+    margin-right: auto;
+    
+    /* Sin gutters horizontales */
+    padding-left: 0;
+    padding-right: 0;
+}
+@media (min-width: 480px) {
+    .hero-content-padding {
+        /* mantener separación vertical */
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+}
+@media (min-width: 640px) {
+    .hero-content-padding {
+        padding-left: 0;
+        padding-right: 0;
+    }
+}
+@media (min-width: 1024px) {
+    .hero-content-padding {
+        padding-left: 0;
+        padding-right: 0;
+    }
+}
+
+.hero-banner {
+    min-height: 480px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem; /* gap-6 */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    text-align: center;
+    border-radius: 0.75rem; 
+}
+@media (min-width: 480px) {
+    .hero-banner {
+        gap: 2rem; /* @[480px]:gap-8 */
+        border-radius: 1rem; /* @[480px]:rounded-xl */
+    }
+}
+
+.hero-text-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.hero-title {
+    color: white;
+    font-size: 2.25rem; /* text-4xl */
+    font-weight: 900; /* font-black */
+    line-height: 1.1;
+    letter-spacing: -0.033em;
+}
+@media (min-width: 480px) {
+    .hero-title {
+        font-size: 3rem; /* @[480px]:text-5xl */
+    }
+}
+
+.hero-subtitle {
+    color: white;
+    font-size: 0.875rem; /* text-sm */
+    font-weight: 400;
+    line-height: 1.5;
+    max-width: 42rem; /* max-w-xl */
+    margin-left: auto;
+    margin-right: auto;
+}
+@media (min-width: 480px) {
+    .hero-subtitle {
+        font-size: 1rem; /* @[480px]:text-base */
+    }
+}
+
+.btn-hero {
+    /* Base */
+    height: 2.5rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1.5;
+    letter-spacing: 0.015em;
+    /* Hero specific */
+    background-color: var(--color-primary);
+    color: white;
+    transition: transform 0.3s ease-in-out, background-color 0.15s ease-in-out;
+}
+@media (min-width: 480px) {
+    .btn-hero {
+        height: 3rem; /* @[480px]:h-12 */
+        padding-left: 1.25rem; /* @[480px]:px-5 */
+        font-size: 1rem; /* @[480px]:text-base */
+    }
+}
+.btn-hero:hover {
+    transform: scale(1.05);
+    background-color: color-mix(in srgb, var(--color-primary) 90%, black);
+}
+
+/* =================================================================
+   5. Chips de Filtro
+================================================================= */
+
+.filter-chips-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem; /* gap-4 */
+    padding-left: 1rem; padding-right: 1rem; /* px-4 */
+    margin-bottom: 2rem; /* mb-8 */
+}
+@media (min-width: 640px) { /* sm:flex-row */
+    .filter-chips-section {
+        flex-direction: row;
+    }
+}
+
+.filter-label {
+    color: var(--color-slate-600);
+    font-weight: 500;
+    white-space: nowrap;
+}
+.app-container.dark-mode .filter-label {
+    color: var(--color-slate-400);
+}
+
+.filter-chips-group {
+    display: flex;
+    gap: 0.75rem; /* gap-3 */
+    flex-wrap: wrap;
+}
+
+.filter-chip {
+    display: flex;
+    height: 2rem; /* h-8 */
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem; /* gap-x-2 */
+    border-radius: 9999px; /* rounded-full */
+    padding-left: 1rem; /* pl-4 */
+    padding-right: 0.5rem; /* pr-2 */
+    background-color: rgba(226, 232, 240, 0.6); /* slate-200/60 */
+    transition: background-color 0.15s ease-in-out;
+    border: none;
+    cursor: pointer;
+}
+.app-container.dark-mode .filter-chip {
+    background-color: rgba(30, 41, 59, 0.6); /* slate-800/60 */
+}
+.filter-chip:hover {
+    background-color: var(--color-slate-200);
+}
+.app-container.dark-mode .filter-chip:hover {
+    background-color: var(--color-slate-800);
+}
+
+.chip-text {
+    color: var(--color-slate-900);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.5;
+}
+.app-container.dark-mode .chip-text {
+    color: var(--color-slate-50);
+}
+
+.chip-icon {
+    color: var(--color-slate-600);
+}
+.app-container.dark-mode .chip-icon {
+    color: var(--color-slate-400);
+}
+
+/* Mascotas Destacadas (Pet Grid) */
+.section-title {
+    color: var(--color-slate-900);
+    font-size: 1.375rem; /* text-[22px] */
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 0.75rem;
+    padding-top: 1rem;       /* antes: 1.25rem */
+    padding-bottom: 0.5rem;  /* antes: 0.75rem */
+}
+.app-container.dark-mode .section-title {
+    color: var(--color-slate-50);
+}
+
+/* Grid de mascotas: compactar padding para reducir espacio extra */
+.pet-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;              /* antes: 1.5rem */
+    padding: 0.5rem;        /* antes: 1rem */
+}
+
+.pet-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;           /* antes: 0.75rem */
+    padding-bottom: 0;      /* antes: 0.75rem */
+}
+
+.pet-image-container {
+    width: 100%;
+    aspect-ratio: 4 / 3;    /* antes: 3 / 4 (más alto) */
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+.pet-image {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    transition: transform 0.3s ease-in-out;
+}
+
+.pet-card:hover .pet-image {
+    transform: scale(1.1);
+}
+
+.pet-name {
+    color: var(--color-slate-900);
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.5;
+}
+.app-container.dark-mode .pet-name {
+    color: var(--color-slate-50);
+}
+
+.pet-details {
+    color: var(--color-slate-500);
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.4;       /* antes: 1.5 */
+}
+.app-container.dark-mode .pet-details {
+    color: var(--color-slate-400);
+}
+
+/* =================================================================
+   7. Cómo Funciona (How It Works)
+================================================================= */
+
+/* Sección “Cómo funciona”: bajar el espacio superior para que quede más cerca del grid */
+.how-it-works-section {
+    padding-top: 4rem; /* py-16 */
+    padding-bottom: 4rem;
+}
+
+.text-center-wrapper {
+    text-align: center;
+    margin-bottom: 3rem; /* mb-12 */
+}
+
+.how-it-works-title {
+    color: var(--color-slate-900);
+    font-size: 1.875rem; /* text-3xl */
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+.app-container.dark-mode .how-it-works-title {
+    color: var(--color-slate-50);
+}
+
+.how-it-works-subtitle {
+    color: var(--color-slate-500);
+    margin-top: 0.5rem;
+    max-width: 42rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+.app-container.dark-mode .how-it-works-subtitle {
+    color: var(--color-slate-400);
+}
+
+.steps-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem; /* gap-8 */
+    text-align: center;
+}
+@media (min-width: 768px) { /* md:grid-cols-3 */
+    .steps-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.step-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem; /* p-6 */
+    background-color: white;
+    border-radius: 0.75rem; /* rounded-xl */
+    box-shadow: var(--shadow-sm);
+}
+.app-container.dark-mode .step-card {
+    background-color: var(--color-slate-900);
+}
+
+.step-icon-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 4rem;
+    width: 4rem;
+    border-radius: 9999px; /* rounded-full */
+    background-color: color-mix(in srgb, var(--color-primary) 20%, transparent); /* primary/20 */
+    color: var(--color-primary);
+    margin-bottom: 1rem; /* mb-4 */
+}
+
+.step-title {
+    font-size: 1.125rem; /* text-lg */
+    font-weight: 700;
+    color: var(--color-slate-900);
+    margin-bottom: 0.5rem; /* mb-2 */
+}
+.app-container.dark-mode .step-title {
+    color: var(--color-slate-50);
+}
+
+.step-description {
+    color: var(--color-slate-500);
+    font-size: 0.875rem;
+}
+.app-container.dark-mode .step-description {
+    color: var(--color-slate-400);
+}
+
+/* =================================================================
+   8. Footer
+================================================================= */
+
+.main-footer {
+    background-color: white;
+    border-top: 1px solid var(--color-slate-200);
+}
+.app-container.dark-mode .main-footer {
+    background-color: var(--color-slate-900);
+    border-color: var(--color-slate-800);
+}
+
+.footer-max-width-wrapper {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding-top: 3rem; /* py-12 */
+    padding-bottom: 3rem;
+    padding-left: 0;   /* sin gutters laterales */
+    padding-right: 0;
+}
+@media (min-width: 640px) {
+    .footer-max-width-wrapper { padding-left: 0; padding-right: 0; }
+}
+@media (min-width: 1024px) {
+    .footer-max-width-wrapper { padding-left: 0; padding-right: 0; }
+}
+
+.footer-links-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem; /* gap-8 */
+}
+@media (min-width: 768px) { /* md:grid-cols-4 */
+    .footer-links-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.footer-brand-info {
+    grid-column: span 2;
+}
+@media (min-width: 768px) {
+    .footer-brand-info {
+        grid-column: span 1;
+    }
+}
+
+.logo-icon-footer {
+    margin-bottom: 1rem;
+}
+
+.footer-tagline {
+    font-size: 0.875rem;
+    color: var(--color-slate-500);
+}
+.app-container.dark-mode .footer-tagline {
+    color: var(--color-slate-400);
+}
+
+.footer-column-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-slate-900);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+.app-container.dark-mode .footer-column-title {
+    color: var(--color-slate-200);
+}
+
+.footer-link-list {
+    list-style: none;
+    margin-top: 1rem;
+    line-height: 1;
+}
+
+.footer-link-list li {
+    margin-bottom: 1rem;
+}
+
+.footer-link {
+    font-size: 1rem;
+    color: var(--color-slate-500);
+    text-decoration: none;
+    transition: color 0.15s ease-in-out;
+}
+.footer-link:hover {
+    color: var(--color-primary);
+}
+.app-container.dark-mode .footer-link {
+    color: var(--color-slate-400);
+}
+.app-container.dark-mode .footer-link:hover {
+    color: var(--color-primary);
+}
+
+.footer-bottom {
+    margin-top: 2rem;
+    border-top: 1px solid var(--color-slate-200);
+    padding-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+}
+@media (min-width: 640px) {
+    .footer-bottom {
+        flex-direction: row;
+    }
+}
+.app-container.dark-mode .footer-bottom {
+    border-color: var(--color-slate-800);
+}
+
+.footer-copy {
+    font-size: 0.875rem;
+    color: var(--color-slate-500);
+    text-align: center;
+}
+.app-container.dark-mode .footer-copy {
+    color: var(--color-slate-400);
+}
+
+.social-links {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+@media (min-width: 640px) {
+    .social-links {
+        margin-top: 0;
+    }
+}
+
+.social-link {
+    color: var(--color-slate-500);
+    text-decoration: none;
+    transition: color 0.15s ease-in-out;
+}
+.social-link:hover {
+    color: var(--color-primary);
+}
+.app-container.dark-mode .social-link {
+    color: var(--color-slate-400);
+}
+.app-container.dark-mode .social-link:hover {
+    color: var(--color-primary);
+}
+
+/* Gutters laterales suaves en toda la vista Home */
+.header-container {
+  padding-left: 0.75rem;   /* ~12px en móviles */
+  padding-right: 0.75rem;
+  max-width: none;
+  margin: 0;
+  width: 100%;
+}
+@media (min-width: 768px) {
+  .header-container {
+    padding-left: 1rem;    /* ~16px en tablets */
+    padding-right: 1rem;
+  }
+}
+@media (min-width: 1024px) {
+  .header-container {
+    padding-left: 2rem;    /* ~32px en escritorio */
+    padding-right: 2rem;
+  }
+}
+.header-content-wrapper {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+@media (min-width: 768px) {
+  .header-content-wrapper {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+@media (min-width: 1024px) {
+  .header-content-wrapper {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+/* Barra de navegación sin padding horizontal extra, solo vertical si quieres */
+.header-content {
+  padding: 0.75rem 0;
+}
+.app-container.dark-mode .header-content {
+  padding: 0.75rem 0;
+}
+
+/* Contenido principal con gutters ligeros */
+.main-max-width-wrapper {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 2rem;       /* vertical opcional */
+  padding-bottom: 2rem;
+}
+@media (min-width: 768px) {
+  .main-max-width-wrapper {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+@media (min-width: 1024px) {
+  .main-max-width-wrapper {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+.app-container.dark-mode .main-max-width-wrapper {
+  padding: 0.75rem 0;
+}
+
+/* Hero edge-to-edge con gutters suaves */
+.hero-padding,
+.hero-content-padding {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+@media (min-width: 768px) {
+  .hero-padding,
+  .hero-content-padding {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+@media (min-width: 1024px) {
+  .hero-padding,
+  .hero-content-padding {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+.app-container.dark-mode .hero-padding {
+  padding: 0.75rem 0;
+}
+
+/* Footer edge-to-edge con gutters suaves */
+.footer-max-width-wrapper {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  padding-top: 3rem;       /* vertical existente */
+  padding-bottom: 3rem;
+}
+@media (min-width: 768px) {
+  .footer-max-width-wrapper {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+@media (min-width: 1024px) {
+  .footer-max-width-wrapper {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+.app-container.dark-mode .footer-max-width-wrapper {
+  padding: 0.75rem 0;
+}
