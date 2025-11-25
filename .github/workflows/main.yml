@@ -1,44 +1,57 @@
-name: Despliegue Blue-Green
+ name: CI/CD Despliegue Blue-Green - Huellitas Felices
 
 on:
   push:
     branches:
-      - main 
+      - main # Ejecutar el pipeline cada vez que se haga push a la rama 'main'
+  workflow_dispatch: # Permite ejecutar el pipeline manualmente
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest 
+  build-and-deploy:
+    runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout Código
+      - name: Checkout Código 📦
         uses: actions/checkout@v4
 
-      # 1. Configurar SSH para conexión al servidor de despliegue
-      # Requiere configuraciones secretas en GitHub (SSH_KEY, HOST, USER)
-      # - name: Setup SSH
-      #   uses: webfactory/ssh-agent@v0.9.0
-      #   with:
-      #     ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      # ======================================================
+      # 1. AUTENTICACIÓN Y PUSH A DOCKER HUB
+      # ======================================================
+      - name: Iniciar sesión en Docker Hub 🐳
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 2. Copiar archivos necesarios al servidor
-      # - name: Copy files to server
-      #   run: |
-      #     scp Dockerfile nginx.conf deploy.sh ${{ secrets.USER }}@${{ secrets.HOST }}:/ruta/del/proyecto/
+      - name: Construir y Empujar Imagen Docker 🛠️
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: karinasaenz/huellitas-felices-front:latest
 
-      # 3. Ejecutar el script de despliegue Blue-Green en el servidor remoto
-      # - name: Execute Blue-Green Deploy Script
-      #   run: |
-      #     ssh ${{ secrets.USER }}@${{ secrets.HOST }} 'cd /ruta/del/proyecto/ && chmod +x deploy.sh && ./deploy.sh'
-      
-      # --- PASOS DE SIMULACIÓN LOCAL ---
-      - name: Instalar Docker (Simulación Local)
-        uses: docker/setup-docker@v3
-
-      - name: Ejecutar Despliegue Blue-Green
-        run: |
-          chmod +x deploy.sh
-          # Crear los archivos de config necesarios para que el script funcione
-          touch nginx.conf
-          touch Dockerfile
-          # Ejecutar el script (esto construirá las imágenes localmente)
-          ./deploy.sh
+      # ======================================================
+      # 2. DESPLIEGUE REMOTO POR SSH
+      # ======================================================
+      - name: Configurar SSH Key para el Servidor 🔑
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          # Usaremos la llave SSH privada de tu servidor de despliegue
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          
+      - name: Ejecutar Script de Despliegue Blue-Green en Servidor 🔄
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}           # IP o Dominio del servidor
+          username: ${{ secrets.DEPLOY_USER }}       # Usuario SSH (ej. 'ubuntu', 'ec2-user')
+          key: ${{ secrets.SSH_PRIVATE_KEY }}        # Usamos la misma clave
+          script: |
+            # 1. Navegar al directorio donde estan los archivos de despliegue
+            cd /opt/huellitas-deployment
+            
+            # 2. Asegurarse de que el script sea ejecutable
+            chmod +x deploy.sh
+            
+            # 3. Ejecutar el script (que automáticamente hará el pull de la nueva imagen)
+            ./deploy.sh
