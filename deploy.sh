@@ -16,14 +16,14 @@ PORT_GREEN=8082
 PUBLIC_PORT=80
 
 # 1. Determinar el entorno ACTIVO y el INACTIVO
-# Verifica si el contenedor BLUE existe y está corriendo
+# Verificar si el contenedor BLUE existe y está corriendo
 if docker ps --format '{{.Names}}' | grep -q $BLUE_CONTAINER_NAME; then
     ACTIVE_CONTAINER=$BLUE_CONTAINER_NAME
     INACTIVE_CONTAINER=$GREEN_CONTAINER_NAME
     NEW_PORT=$PORT_GREEN
     OLD_PORT=$PORT_BLUE
 else
-    # Si BLUE no está corriendo, asumimos que GREEN es el activo (o ninguno)
+    # Si BLUE no está corriendo, se da por hecho que GREEN es el activo (o ninguno)
     ACTIVE_CONTAINER=$GREEN_CONTAINER_NAME
     INACTIVE_CONTAINER=$BLUE_CONTAINER_NAME
     NEW_PORT=$PORT_BLUE
@@ -35,7 +35,7 @@ echo "Entorno INACTIVO (a desplegar): $INACTIVE_CONTAINER (Puerto $NEW_PORT)"
 echo "----------------------------------------------------"
 
 # 2. Pull o Construcción de la nueva imagen
-# En un pipeline real, harías 'docker pull $IMAGE_NAME'
+# En un pipeline real, se hace 'docker pull $IMAGE_NAME'
 # Para el ejemplo, construimos la imagen:
 echo "1. Construyendo la nueva imagen..."
 docker build -t $IMAGE_NAME .

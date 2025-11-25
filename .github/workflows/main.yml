@@ -3,19 +3,18 @@ name: Despliegue Blue-Green
 on:
   push:
     branches:
-      - main # O la rama que uses para producción
+      - main 
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest # Esto debe ser un runner autoalojado o un servidor SSH
+    runs-on: ubuntu-latest 
     
-    # Simulación de Conexión a Servidor Remoto
     steps:
       - name: Checkout Código
         uses: actions/checkout@v4
 
       # 1. Configurar SSH para conexión al servidor de despliegue
-      # Requiere que configures secretos en GitHub (SSH_KEY, HOST, USER)
+      # Requiere configuraciones secretas en GitHub (SSH_KEY, HOST, USER)
       # - name: Setup SSH
       #   uses: webfactory/ssh-agent@v0.9.0
       #   with:
