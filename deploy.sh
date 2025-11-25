@@ -78,7 +78,7 @@ echo "----------------------------------------------------"
 # En una implementación avanzada, el proxy es un Load Balancer real.
 # Para esta simulación, usaremos un NGINX proxy que alterna el backend.
 
-PROXY_CONFIG_FILE="/etc/nginx/conf.d/huellitas_proxy.conf" # Asumiendo que el proxy NGINX tiene esta ruta montada
+# PROXY_CONFIG_FILE="/etc/nginx/conf.d/huellitas_proxy.conf" # Asumiendo que el proxy NGINX tiene esta ruta montada
 NEW_BACKEND="$INACTIVE_CONTAINER:80"
 
 # Crea la configuración de proxy temporal para alternar el destino
@@ -103,7 +103,7 @@ if ! docker ps -a --format '{{.Names}}' | grep -q $NGINX_PROXY_NAME; then
         --name $NGINX_PROXY_NAME \
         --network $NGINX_NETWORK \
         -p $PUBLIC_PORT:80 \
-        -v "$(pwd)/proxy.conf":$PROXY_CONFIG_FILE \
+        -v "$(pwd)/proxy.conf":/etc/nginx/conf.d/default.conf \
         nginx:alpine
 else
     echo "5. Recargando la configuración del PROXY NGINX para alternar a $INACTIVE_CONTAINER..."
