@@ -1,49 +1,119 @@
 #!/bin/bash
+# ----------------------------------------------------
+# Script de Despliegue Blue-Green
+# ----------------------------------------------------
 
-# Nombre de tu imagen de Docker (¡Súbela a Docker Hub primero!)
-IMAGE_TAG="karinasari19/huellitas-felices-front:latest" 
-# Nombre del archivo de configuración de Nginx externo en el VPS (ejemplo)
-NGINX_CONF="/etc/nginx/sites-available/huellitas_proxy.conf" 
-# Puertos para el Blue-Green
-BLUE_PORT="8080"
-GREEN_PORT="8081"
+# Variables de configuración
+REPO_NAME="karinasaenz/huellitas-felices-front"  
+TAG="latest"
+IMAGE_NAME="$REPO_NAME:$TAG"
+BLUE_CONTAINER_NAME="huellitas-blue"
+GREEN_CONTAINER_NAME="huellitas-green"
+NGINX_PROXY_NAME="huellitas-proxy"
+NGINX_NETWORK="huellitas-net"
+PORT_BLUE=8081
+PORT_GREEN=8082
+PUBLIC_PORT=80
 
-# Determina qué puerto está ACTIVO leyendo la configuración de Nginx
-# Si la configuración actual apunta al BLUE, el nuevo despliegue es GREEN.
-if grep -q "proxy_pass http://localhost:$BLUE_PORT;" $NGINX_CONF; then
-    NEW_PORT=$GREEN_PORT
-    OLD_PORT=$BLUE_PORT
-    NEW_CONTAINER_NAME="green-app"
-    OLD_CONTAINER_NAME="blue-app"
+# 1. Determinar el entorno ACTIVO y el INACTIVO
+# Verifica si el contenedor BLUE existe y está corriendo
+if docker ps --format '{{.Names}}' | grep -q $BLUE_CONTAINER_NAME; then
+    ACTIVE_CONTAINER=$BLUE_CONTAINER_NAME
+    INACTIVE_CONTAINER=$GREEN_CONTAINER_NAME
+    NEW_PORT=$PORT_GREEN
+    OLD_PORT=$PORT_BLUE
 else
-    NEW_PORT=$BLUE_PORT
-    OLD_PORT=$GREEN_PORT
-    NEW_CONTAINER_NAME="blue-app"
-    OLD_CONTAINER_NAME="green-app"
+    # Si BLUE no está corriendo, asumimos que GREEN es el activo (o ninguno)
+    ACTIVE_CONTAINER=$GREEN_CONTAINER_NAME
+    INACTIVE_CONTAINER=$BLUE_CONTAINER_NAME
+    NEW_PORT=$PORT_BLUE
+    OLD_PORT=$PORT_GREEN
 fi
 
-echo "Desplegando la nueva versión ($NEW_CONTAINER_NAME) en el puerto $NEW_PORT..."
+echo "Entorno ACTIVO: $ACTIVE_CONTAINER (Puerto $OLD_PORT)"
+echo "Entorno INACTIVO (a desplegar): $INACTIVE_CONTAINER (Puerto $NEW_PORT)"
+echo "----------------------------------------------------"
 
-# 1. Descargar la nueva imagen
-docker pull $IMAGE_TAG
+# 2. Pull o Construcción de la nueva imagen
+# En un pipeline real, harías 'docker pull $IMAGE_NAME'
+# Para el ejemplo, construimos la imagen:
+echo "1. Construyendo la nueva imagen..."
+docker build -t $IMAGE_NAME .
+if [ $? -ne 0 ]; then
+    echo "ERROR: Falló la construcción de la imagen."
+    exit 1
+fi
+echo "Imagen construida: $IMAGE_NAME"
+echo "----------------------------------------------------"
 
-# 2. Levantar el nuevo contenedor en el puerto inactivo
-docker run -d --name $NEW_CONTAINER_NAME -p $NEW_PORT:80 $IMAGE_TAG
+# 3. Crear red si no existe (para comunicación interna)
+docker network create $NGINX_NETWORK 2>/dev/null || true
 
-echo "Nueva versión desplegada. Verificando salud..."
-sleep 15 # Espera a que la aplicación esté lista
+# 4. Detener y eliminar el contenedor INACTIVO anterior (si existe)
+echo "2. Eliminando el contenedor INACTIVO anterior ($INACTIVE_CONTAINER)..."
+docker stop $INACTIVE_CONTAINER 2>/dev/null
+docker rm $INACTIVE_CONTAINER 2>/dev/null
+echo "----------------------------------------------------"
 
-# 3. SWAP (Cambio de tráfico): Actualizar Nginx para apuntar al nuevo puerto
-# Este comando cambia el puerto en el archivo de configuración de Nginx externo
-sudo sed -i "s/$OLD_PORT/$NEW_PORT/g" $NGINX_CONF
+# 5. Desplegar la nueva versión en el entorno INACTIVO
+echo "3. Desplegando la nueva versión ($INACTIVE_CONTAINER) en el puerto $NEW_PORT..."
+docker run -d \
+    --name $INACTIVE_CONTAINER \
+    --network $NGINX_NETWORK \
+    -p $NEW_PORT:80 \
+    $IMAGE_NAME
+if [ $? -ne 0 ]; then
+    echo "ERROR: Falló el despliegue del nuevo contenedor."
+    exit 1
+fi
 
-# 4. Recargar Nginx para aplicar el cambio sin interrupción
-echo "Recargando Nginx para completar el SWAP..."
-sudo nginx -s reload
+# 6. Esperar a que el nuevo contenedor esté "saludable" (Health Check)
+# En un entorno real, se debería hacer un HTTP GET al nuevo contenedor
+echo "4. Esperando 10 segundos para Health Check del nuevo contenedor..."
+sleep 10
+echo "----------------------------------------------------"
 
-# 5. Detener y eliminar el contenedor antiguo
-echo "Deteniendo y eliminando la versión anterior ($OLD_CONTAINER_NAME)..."
-docker stop $OLD_CONTAINER_NAME
-docker rm $OLD_CONTAINER_NAME
+# 7. Desplegar o actualizar el Proxy NGINX (El corazón del Blue-Green)
+# Este proxy apuntará al nuevo contenedor.
+# En una implementación avanzada, el proxy es un Load Balancer real.
+# Para esta simulación, usaremos un NGINX proxy que alterna el backend.
 
-echo "¡Despliegue Blue-Green exitoso! El servicio corre en el puerto $NEW_PORT."
+PROXY_CONFIG_FILE="/etc/nginx/conf.d/huellitas_proxy.conf" # Asumiendo que el proxy NGINX tiene esta ruta montada
+NEW_BACKEND="$INACTIVE_CONTAINER:80"
+
+# Crea la configuración de proxy temporal para alternar el destino
+cat > proxy.conf <<EOF
+server {
+    listen 80;
+
+    location / {
+        # Alterna el destino al nuevo contenedor
+        proxy_pass http://$NEW_BACKEND; 
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
+}
+EOF
+
+# 8. Desplegar el NGINX Proxy (si no existe) o Recargar su configuración
+if ! docker ps -a --format '{{.Names}}' | grep -q $NGINX_PROXY_NAME; then
+    echo "5. Desplegando el PROXY NGINX inicial en el puerto $PUBLIC_PORT..."
+    docker run -d \
+        --name $NGINX_PROXY_NAME \
+        --network $NGINX_NETWORK \
+        -p $PUBLIC_PORT:80 \
+        -v "$(pwd)/proxy.conf":$PROXY_CONFIG_FILE \
+        nginx:alpine
+else
+    echo "5. Recargando la configuración del PROXY NGINX para alternar a $INACTIVE_CONTAINER..."
+    # Sobrescribe el archivo de configuración en el volumen montado y recarga NGINX
+    docker cp proxy.conf $NGINX_PROXY_NAME:$PROXY_CONFIG_FILE
+    docker exec $NGINX_PROXY_NAME nginx -s reload
+fi
+
+# 9. Limpieza
+echo "6. Proceso de despliegue Blue-Green completado."
+echo "La nueva versión ($INACTIVE_CONTAINER) ahora está ACTIVA en el puerto $PUBLIC_PORT."
+echo "El contenedor antiguo ($ACTIVE_CONTAINER) sigue corriendo en el puerto $OLD_PORT para rollback rápido."
+rm proxy.conf # Limpia el archivo de configuración temporal

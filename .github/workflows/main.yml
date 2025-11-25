@@ -1,0 +1,45 @@
+name: Despliegue Blue-Green
+
+on:
+  push:
+    branches:
+      - main # O la rama que uses para producción
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest # Esto debe ser un runner autoalojado o un servidor SSH
+    
+    # Simulación de Conexión a Servidor Remoto
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      # 1. Configurar SSH para conexión al servidor de despliegue
+      # Requiere que configures secretos en GitHub (SSH_KEY, HOST, USER)
+      # - name: Setup SSH
+      #   uses: webfactory/ssh-agent@v0.9.0
+      #   with:
+      #     ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # 2. Copiar archivos necesarios al servidor
+      # - name: Copy files to server
+      #   run: |
+      #     scp Dockerfile nginx.conf deploy.sh ${{ secrets.USER }}@${{ secrets.HOST }}:/ruta/del/proyecto/
+
+      # 3. Ejecutar el script de despliegue Blue-Green en el servidor remoto
+      # - name: Execute Blue-Green Deploy Script
+      #   run: |
+      #     ssh ${{ secrets.USER }}@${{ secrets.HOST }} 'cd /ruta/del/proyecto/ && chmod +x deploy.sh && ./deploy.sh'
+      
+      # --- PASOS DE SIMULACIÓN LOCAL ---
+      - name: Instalar Docker (Simulación Local)
+        uses: docker/setup-docker@v3
+
+      - name: Ejecutar Despliegue Blue-Green
+        run: |
+          chmod +x deploy.sh
+          # Crear los archivos de config necesarios para que el script funcione
+          touch nginx.conf
+          touch Dockerfile
+          # Ejecutar el script (esto construirá las imágenes localmente)
+          ./deploy.sh

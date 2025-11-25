@@ -1,23 +1,33 @@
-# ETAPA 1: BUILD (Compilación de la aplicación de Vite/React/etc.)
-FROM node:18-alpine AS builder
+# --- Etapa 1: Construcción (Build) ---
+FROM node:20-alpine AS build
 
+# Establece el directorio de trabajo
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm install
-COPY . .
-RUN npm run build 
 
-# ---
-# ETAPA 2: PRODUCTION (Usa Nginx para servir los archivos estáticos)
+# Copia los archivos de manifiesto del proyecto
+COPY package*.json ./
+
+# Instala las dependencias
+RUN npm install
+
+# Copia el resto de los archivos del proyecto
+COPY . .
+
+# Construye la aplicación para producción
+RUN npm run build
+
+# --- Etapa 2: Servidor (Runtime) con NGINX ---
 FROM nginx:alpine
 
+# Copia la configuración de NGINX personalizada
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# 'dist' es la carpeta de salida común para proyectos con Vite
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copia los archivos estáticos de la aplicación construida
+# desde la etapa 'build' al directorio de servicio de NGINX
+COPY --from=build /app/dist /usr/share/nginx/html
 
-# El contenedor escuchará en el puerto 80
+# El puerto 80 es el predeterminado para NGINX
 EXPOSE 80
 
-# Comando para iniciar Nginx
+# Comando para iniciar NGINX
 CMD ["nginx", "-g", "daemon off;"]
