@@ -18,7 +18,7 @@ const LogoIcon = () => (
 
 const Home = () => {
   const featuredPets = [
-    { name: "Max", details: "Perro, 2 años", imageUrl: "https://www.clinicaveterinariaaguilar.es/wp-content/uploads/2020/01/cachorro.jpg", alt: "Un perro cachorro de raza mixta mirando a la cámara" },
+    { name: "Maxx", details: "Perro, 2 años", imageUrl: "https://www.clinicaveterinariaaguilar.es/wp-content/uploads/2020/01/cachorro.jpg", alt: "Un perro cachorro de raza mixta mirando a la cámara" },
     { name: "Luna", details: "Gata, 1 año", imageUrl: "https://fotografias.lasexta.com/clipping/cmsimages02/2019/01/25/DB41B993-B4C4-4E95-8B01-C445B8544E8E/98.jpg?crop=4156,2338,x0,y219&width=1900&height=1069&optimize=high&format=webply", alt: "Una gata atigrada sentada en una ventana" },
     { name: "Rocky", details: "Perro, 4 años", imageUrl: "https://i.redd.it/my-2-year-old-pitbull-pupper-v0-bg9q8bd1tzce1.jpg?width=1200&format=pjpg&auto=webp&s=f4ef7053c66328da7ea629afe2d7681ab6855c9d", alt: "Un perro bulldog francés con una corbata de moño" },
     { name: "Bella", details: "Gata, 3 años", imageUrl: "https://images.ctfassets.net/denf86kkcx7r/4IPlg4Qazd4sFRuCUHIJ1T/f6c71da7eec727babcd554d843a528b8/gatocomuneuropeo-97?fm=webp&w=612", alt: "Una gata siamesa con ojos azules intensos" },
