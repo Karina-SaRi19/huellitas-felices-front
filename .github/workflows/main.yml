@@ -41,10 +41,10 @@ jobs:
       # 2. DESPLIEGUE REMOTO POR SSH
       # ======================================================
       - name: Configurar SSH Key para el Servidor 🔑
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
+        #uses: webfactory/ssh-agent@v0.9.0
+        #with:
           # Carga la llave privada para que el sistema la use automáticamente
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          #ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           
       - name: Ejecutar Script de Despliegue Blue-Green en Servidor 🔄
         uses: appleboy/ssh-action@v1.0.0
