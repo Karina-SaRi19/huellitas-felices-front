@@ -51,7 +51,8 @@ jobs:
         with:
           host: ${{ secrets.DEPLOY_HOST }}  # IP o Dominio del servidor
           username: ${{ secrets.DEPLOY_USER }}  # Usuario SSH (debe ser 'root')
-          # ¡CORRECCIÓN CLAVE!: Se elimina 'key' para usar la llave cargada por el Agente.
+          pass: ${{ secrets.DEPLOY_PASSWORD }} 
+      # Use the 'pass' parameter if you set a passphrase on your key
           script: |
             # 1. Navegar al directorio donde estan los archivos de despliegue
             cd /opt/huellitas-deployment
