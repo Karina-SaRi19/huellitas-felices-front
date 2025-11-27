@@ -45,7 +45,7 @@ jobs:
         with:
           host: ${{ secrets.DEPLOY_HOST }}  # IP o Dominio del servidor
           username: ${{ secrets.DEPLOY_USER }}  # Usuario SSH (debe ser 'root')
-          pass: ${{ secrets.DEPLOY_PASSWORD }} 
+          password: ${{ secrets.DEPLOY_PASSWORD }} 
       # Use the 'pass' parameter if you set a passphrase on your key
           script: |
             # 1. Navegar al directorio donde estan los archivos de despliegue
