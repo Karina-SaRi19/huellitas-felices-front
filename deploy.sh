@@ -1,121 +1,220 @@
 #!/bin/bash
 # ----------------------------------------------------
-# Script de Despliegue Blue-Green - VERSIÓN FINAL Y COMPROBADA
+# Blue-Green Deployment Script with Host Nginx
 # ----------------------------------------------------
 
-# Variables de configuración
-REPO_NAME="karinasaenz/huellitas-felices-front"  
+set -e  # Exit on error
+
+# Configuration Variables
+REPO_NAME="karinasaenz/huellitas-felices-front"  
 TAG="latest"
 IMAGE_NAME="$REPO_NAME:$TAG"
 BLUE_CONTAINER_NAME="huellitas-blue"
 GREEN_CONTAINER_NAME="huellitas-green"
-NGINX_PROXY_NAME="huellitas-proxy"
-NGINX_NETWORK="huellitas-net"
 PORT_BLUE=8081
 PORT_GREEN=8082
-PUBLIC_PORT=80
+NGINX_CONFIG="/etc/nginx/conf.d/proxy.conf"
+HEALTH_CHECK_RETRIES=5
+HEALTH_CHECK_DELAY=3
 
-# 1. Determinar el entorno ACTIVO y el INACTIVO
-if docker ps --format '{{.Names}}' | grep -q $BLUE_CONTAINER_NAME; then
-ACTIVE_CONTAINER=$BLUE_CONTAINER_NAME
-INACTIVE_CONTAINER=$GREEN_CONTAINER_NAME
-NEW_PORT=$PORT_GREEN
-OLD_PORT=$PORT_BLUE
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo "============================================"
+echo "Blue-Green Deployment Script"
+echo "============================================"
+
+# 1. Determine ACTIVE and INACTIVE environments
+if docker ps --format '{{.Names}}' | grep -q "^${BLUE_CONTAINER_NAME}$"; then
+    if docker ps --format '{{.Names}}' | grep -q "^${GREEN_CONTAINER_NAME}$"; then
+        # Both running - check nginx config to see which is active
+        if grep -q "$PORT_BLUE" $NGINX_CONFIG; then
+            ACTIVE_CONTAINER=$BLUE_CONTAINER_NAME
+            INACTIVE_CONTAINER=$GREEN_CONTAINER_NAME
+            ACTIVE_PORT=$PORT_BLUE
+            INACTIVE_PORT=$PORT_GREEN
+        else
+            ACTIVE_CONTAINER=$GREEN_CONTAINER_NAME
+            INACTIVE_CONTAINER=$BLUE_CONTAINER_NAME
+            ACTIVE_PORT=$PORT_GREEN
+            INACTIVE_PORT=$PORT_BLUE
+        fi
+    else
+        # Only blue running
+        ACTIVE_CONTAINER=$BLUE_CONTAINER_NAME
+        INACTIVE_CONTAINER=$GREEN_CONTAINER_NAME
+        ACTIVE_PORT=$PORT_BLUE
+        INACTIVE_PORT=$PORT_GREEN
+    fi
+elif docker ps --format '{{.Names}}' | grep -q "^${GREEN_CONTAINER_NAME}$"; then
+    # Only green running
+    ACTIVE_CONTAINER=$GREEN_CONTAINER_NAME
+    INACTIVE_CONTAINER=$BLUE_CONTAINER_NAME
+    ACTIVE_PORT=$PORT_GREEN
+    INACTIVE_PORT=$PORT_BLUE
 else
-ACTIVE_CONTAINER=$GREEN_CONTAINER_NAME
-INACTIVE_CONTAINER=$BLUE_CONTAINER_NAME
-NEW_PORT=$PORT_BLUE
-OLD_PORT=$PORT_GREEN
+    # Nothing running - start with blue
+    ACTIVE_CONTAINER="none"
+    INACTIVE_CONTAINER=$BLUE_CONTAINER_NAME
+    ACTIVE_PORT=0
+    INACTIVE_PORT=$PORT_BLUE
 fi
 
-echo "Entorno ACTIVO: $ACTIVE_CONTAINER (Puerto $OLD_PORT)"
-echo "Entorno INACTIVO (a desplegar): $INACTIVE_CONTAINER (Puerto $NEW_PORT)"
+echo -e "${GREEN}Active Environment:${NC} $ACTIVE_CONTAINER (Port: $ACTIVE_PORT)"
+echo -e "${YELLOW}Target Environment:${NC} $INACTIVE_CONTAINER (Port: $INACTIVE_PORT)"
 echo "----------------------------------------------------"
 
-# 2. Pull o Construcción de la nueva imagen
-echo "1. Construyendo la nueva imagen..."
-docker build -t $IMAGE_NAME .
-if [ $? -ne 0 ]; then
-echo "ERROR: Falló la construcción de la imagen."
-exit 1
+# 2. Build or Pull the new image
+echo "Step 1: Building new image..."
+if [ -f "Dockerfile" ]; then
+    docker build -t $IMAGE_NAME . || {
+        echo -e "${RED}ERROR: Failed to build image${NC}"
+        exit 1
+    }
+else
+    docker pull $IMAGE_NAME || {
+        echo -e "${RED}ERROR: Failed to pull image${NC}"
+        exit 1
+    }
 fi
-echo "Imagen construida: $IMAGE_NAME"
+echo -e "${GREEN}✓ Image ready: $IMAGE_NAME${NC}"
 echo "----------------------------------------------------"
 
-# 3. Crear red si no existe (para comunicación interna)
-docker network create $NGINX_NETWORK 2>/dev/null || true
-
-# 4. Detener y eliminar el contenedor INACTIVO anterior (si existe)
-echo "2. Eliminando el contenedor INACTIVO anterior ($INACTIVE_CONTAINER)..."
-docker stop $INACTIVE_CONTAINER 2>/dev/null
-docker rm $INACTIVE_CONTAINER 2>/dev/null
+# 3. Stop and remove the INACTIVE container
+echo "Step 2: Preparing inactive environment ($INACTIVE_CONTAINER)..."
+docker stop $INACTIVE_CONTAINER 2>/dev/null || true
+docker rm $INACTIVE_CONTAINER 2>/dev/null || true
+echo -e "${GREEN}✓ Inactive environment cleaned${NC}"
 echo "----------------------------------------------------"
 
-# 5. Desplegar la nueva versión en el entorno INACTIVO
-echo "3. Desplegando la nueva versión ($INACTIVE_CONTAINER) en el puerto $NEW_PORT..."
+# 4. Deploy new version to INACTIVE environment
+echo "Step 3: Deploying new version to $INACTIVE_CONTAINER (Port: $INACTIVE_PORT)..."
 docker run -d \
---name $INACTIVE_CONTAINER \
---network $NGINX_NETWORK \
--p $NEW_PORT:80 \
-$IMAGE_NAME
-if [ $? -ne 0 ]; then
-echo "ERROR: Falló el despliegue del nuevo contenedor."
-exit 1
-fi
-
-# 6. Esperar a que el nuevo contenedor esté "saludable" (Health Check)
-echo "4. Esperando 10 segundos para Health Check del nuevo contenedor..."
-sleep 10
+    --name $INACTIVE_CONTAINER \
+    --restart unless-stopped \
+    -p $INACTIVE_PORT:80 \
+    $IMAGE_NAME || {
+        echo -e "${RED}ERROR: Failed to start new container${NC}"
+        exit 1
+    }
+echo -e "${GREEN}✓ New container deployed${NC}"
 echo "----------------------------------------------------"
 
-# 7. Desplegar o actualizar el Proxy NGINX (El corazón del Blue-Green)
-NEW_BACKEND="$INACTIVE_CONTAINER:80"
+# 5. Health Check on new deployment
+echo "Step 4: Running health checks on new deployment..."
+HEALTHY=false
+for i in $(seq 1 $HEALTH_CHECK_RETRIES); do
+    echo "Health check attempt $i/$HEALTH_CHECK_RETRIES..."
+    sleep $HEALTH_CHECK_DELAY
+    
+    if curl -f -s http://localhost:$INACTIVE_PORT/ > /dev/null 2>&1; then
+        HEALTHY=true
+        echo -e "${GREEN}✓ Health check passed${NC}"
+        break
+    fi
+done
 
-# Crea la configuración de proxy temporal
-cat > proxy.conf <<EOF
-worker_processes 1;
+if [ "$HEALTHY" = false ]; then
+    echo -e "${RED}ERROR: Health check failed after $HEALTH_CHECK_RETRIES attempts${NC}"
+    echo "Rolling back - stopping new container..."
+    docker stop $INACTIVE_CONTAINER
+    docker rm $INACTIVE_CONTAINER
+    exit 1
+fi
+echo "----------------------------------------------------"
 
-events {
-worker_connections 1024;
+# 6. Switch Nginx to point to new container
+echo "Step 5: Switching traffic to new environment..."
+
+# Backup current config
+cp $NGINX_CONFIG ${NGINX_CONFIG}.backup
+
+# Create new nginx configuration
+cat > $NGINX_CONFIG <<EOF
+upstream frontend {
+    server 127.0.0.1:$INACTIVE_PORT;
 }
 
-http {
- include /etc/nginx/mime.types;
-  default_type application/octet-stream;
- sendfile on;
- keepalive_timeout 65;
-
- server {
- listen 80;
-
- location / {
- proxy_pass http://$NEW_BACKEND;
- proxy_set_header Host \$host;
- proxy_set_header X-Real-IP \$remote_addr;
- proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
- }
- }
+server {
+    listen 80;
+    server_name 164.92.81.133;
+    
+    location / {
+        proxy_pass http://frontend;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        
+        # Health check and timeout settings
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
 }
 EOF
 
-# 8. Desplegar el NGINX Proxy (si no existe) o Recargar su configuración
-if ! docker ps -a --format '{{.Names}}' | grep -q $NGINX_PROXY_NAME; then
-echo "5. Desplegando el PROXY NGINX inicial en el puerto $PUBLIC_PORT..."
-docker run -d \
---name $NGINX_PROXY_NAME \
---network $NGINX_NETWORK \
--p $PUBLIC_PORT:80 \
--v "$(pwd)/proxy.conf":/etc/nginx/conf.d/default.conf \
-nginx:alpine
-else
-echo "5. Recargando la configuración del PROXY NGINX para alternar a $INACTIVE_CONTAINER..."
-# Sobrescribe el archivo de configuración en el volumen montado y recarga NGINX
- docker cp proxy.conf $NGINX_PROXY_NAME:/etc/nginx/conf.d/default.conf
- docker exec $NGINX_PROXY_NAME nginx -s reload
+# Test nginx configuration
+if ! nginx -t 2>/dev/null; then
+    echo -e "${RED}ERROR: Invalid nginx configuration${NC}"
+    echo "Restoring backup..."
+    mv ${NGINX_CONFIG}.backup $NGINX_CONFIG
+    docker stop $INACTIVE_CONTAINER
+    docker rm $INACTIVE_CONTAINER
+    exit 1
 fi
 
-# 9. Limpieza
-echo "6. Proceso de despliegue Blue-Green completado."
-echo "La nueva versión ($INACTIVE_CONTAINER) ahora está ACTIVA en el puerto $PUBLIC_PORT."
-echo "El contenedor antiguo ($ACTIVE_CONTAINER) sigue corriendo en el puerto $OLD_PORT para rollback rápido."
-rm proxy.conf # Limpia el archivo de configuración temporal
+# Reload nginx
+nginx -s reload || {
+    echo -e "${RED}ERROR: Failed to reload nginx${NC}"
+    echo "Restoring backup..."
+    mv ${NGINX_CONFIG}.backup $NGINX_CONFIG
+    nginx -s reload
+    exit 1
+}
+
+echo -e "${GREEN}✓ Traffic switched to $INACTIVE_CONTAINER${NC}"
+echo "----------------------------------------------------"
+
+# 7. Verify the switch worked
+echo "Step 6: Verifying traffic switch..."
+sleep 2
+if curl -f -s http://localhost/ > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Public endpoint responding correctly${NC}"
+else
+    echo -e "${YELLOW}Warning: Public endpoint check failed, but continuing...${NC}"
+fi
+echo "----------------------------------------------------"
+
+# 8. Cleanup old container (optional - keep for quick rollback)
+echo "Step 7: Cleanup options..."
+echo ""
+echo "The old container ($ACTIVE_CONTAINER) is still running for quick rollback."
+echo ""
+echo "To remove it manually later, run:"
+echo "  docker stop $ACTIVE_CONTAINER && docker rm $ACTIVE_CONTAINER"
+echo ""
+echo "To rollback immediately, run:"
+echo "  docker stop $INACTIVE_CONTAINER && nginx -s reload"
+echo "  (Then manually update nginx config to point back to port $ACTIVE_PORT)"
+echo "----------------------------------------------------"
+
+# 9. Success summary
+echo -e "${GREEN}"
+echo "============================================"
+echo "  DEPLOYMENT SUCCESSFUL!"
+echo "============================================"
+echo -e "${NC}"
+echo "Active Environment: $INACTIVE_CONTAINER (Port: $INACTIVE_PORT)"
+echo "Previous Environment: $ACTIVE_CONTAINER (Port: $ACTIVE_PORT) - Still running"
+echo ""
+echo "Public URL: http://164.92.81.133/"
+echo ""
+echo "Deployment completed at: $(date)"
+echo "============================================"
+
+# Cleanup backup
+rm -f ${NGINX_CONFIG}.backup
